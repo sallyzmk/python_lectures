@@ -128,5 +128,5 @@ dmypy.json
 # Pyre type checker
 .pyre/
 
-# data
+# data 여기 있는 것들은 깃허브에 안올라감. 대신 git add .로 gitignore 부터 올리고 git clone, git push를 해줘야한다.
 data/
