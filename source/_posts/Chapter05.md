@@ -1,7 +1,10 @@
 ---
-# title: "혼공머 Chapter 05"
+title: "혼공머 Chapter 05"
 date: '2022-07-04 01:00'
 ---
+
+# 0. 자율학습
+- 딥러닝 논문.pdf 단톡방에 있음.
 
 # Chapter 05-1 결정 트리 (가장 중요함)
 - 직관적이다.
@@ -530,7 +533,7 @@ plt.show()
 
 
     
-![png](output_28_1.png)
+![png](output_29_1.png)
     
 
 
@@ -556,7 +559,7 @@ plt.show()
 
 
     
-![png](output_29_1.png)
+![png](output_30_1.png)
     
 
 
@@ -582,7 +585,7 @@ plt.show()
 
 
     
-![png](output_30_1.png)
+![png](output_31_1.png)
     
 
 
@@ -611,7 +614,7 @@ plt.show()
 
 
     
-![png](output_33_0.png)
+![png](output_34_0.png)
     
 
 
@@ -657,7 +660,7 @@ plt.show()
 
 
     
-![png](output_36_1.png)
+![png](output_37_1.png)
     
 
 
@@ -673,7 +676,7 @@ plt.show()
 
 
     
-![png](output_37_0.png)
+![png](output_38_0.png)
     
 
 
@@ -938,3 +941,115 @@ dt = gs.best_estimator_
     best :  DecisionTreeClassifier(max_depth=7, min_impurity_decrease=0.0005,
                            random_state=42)
     
+
+# Chapter 05-3 트리의 앙상블
+
+## 랜덤 포레스트
+- Decision Tree (나무 1개)
+  + 랜덤 포레스트 (여러개 심음)
+  + 샘플링
+  + Feature Importances
+- 과대적합되는 것을 막아주고 검증 세트와 테스트 세트에서 안정적인 성능을 얻을 수 있다.
+
+- 예측해야 할 행의 갯수, 100만개
+- 컬럼의 갯수(독립변수) 200개 --> 100개
+  + sqrt(): 
+  + 나무 100개를 심고 평균을 내자
+  + 나무 1개 당 컬럼을 10개로
+  + T1 mae : 20 / T2 mae: 30 / T3 mae 10, ...
+  + T1~T100 mae : 20 <--이게 전체적인 평가지표
+
+- 샘플링: 부트스트랩 샘플 (복원 추출) -> 결정트리 훈련
+  + 주머니에 구슬을 다시 넣고 섞고 @개 추출
+  + (결정트리는 주머니에서 추출, 다시 안넣고, 또 추출했다.->정형데이터)
+  + 시간이 오래걸림
+  + vote 투표로 결정됨?
+
+
+```python
+# 라이브러리 설치
+import numpy as np
+import pandas as pd
+from sklearn.model_selection import train_test_split, cross_validate
+from sklearn.ensemble import RandomForestClassifier
+
+# 데이터 불러오기
+wine = pd. read_csv('https://bit.ly/wine_csv_data')
+
+# input, target 분리
+data = wine[['alcohol', 'sugar', 'pH']].to_numpy()
+target= wine['class'].to_numpy()
+
+# 훈련데이터, 테스트 데이터 분리
+train_input, test_input, train_target, test_target = train_test_split(data, target, test_size=0.2, random_state=42)
+
+# 모델링
+rf= RandomForestClassifier(n_jobs=-1, random_state=42)
+
+# 모형 평가
+scores = cross_validate(rf, train_input, train_target, return_train_score=True, n_jobs=-1)
+print(np.mean(scores['train_score']), np.mean(scores['test_score']))
+
+# 특성 중요도 계산 (랜덤 포레스트의 특성 중요도 : 각 결정 트리의 특성 중요도를 취합한 것)
+rf.fit(train_input, train_target)
+print(rf.feature_importances_)
+
+# OOB (out of bag : 한 번도 안 뽑힌 것들은 검증에 사용 가능: 랜텀 포레스트는 각 트리의 OOB 점수를 평균하여 출력)
+rf= RandomForestClassifier(oob_score=True, n_jobs=-1, random_state=42)
+rf.fit(train_input, train_target)
+print(rf.oob_score_)
+```
+
+    0.9973541965122431 0.8905151032797809
+    [0.23167441 0.50039841 0.26792718]
+    0.8934000384837406
+    
+
+## 엑스트라 트리  [SKIP]
+
+## 그래이디언트 부스팅
+- 깊이가 얕은 결정 트리를 사용하여 이전 트리의 오차를 보완
+- 유기적, 상호 보완적
+- T1 ~ TN 증가하면서 오차를 보정해주며 정확성을 높임
+- 경사하강법의 원리를 이용함
+- 단점: 정확성은 좋으나 속도가 너무 느림
+- 해결책: XGBoost, LightGBM
+
+### 랜덤포레스트와의 차이점
+- 랜덤 포레스트는 각 나무간 상호 연관성이 없다.
+- 부스팅은 각 나무간 상호 연관성 있음
+
+
+```python
+from sklearn.ensemble import GradientBoostingClassifier
+gb = GradientBoostingClassifier(random_state=42)
+scores = cross_validate(gb,train_input, train_target, return_train_score=True, n_jobs=-1)
+print(np.mean(scores['train_score']), np.mean(scores['test_score']))
+```
+
+    0.8881086892152563 0.8720430147331015
+    
+
+
+```python
+# 학습률 조정 (100->500 증가, learning_rate= 기본값은 0.1)
+gb = GradientBoostingClassifier(n_estimators=500, learning_rate=0.2, random_state=42)
+scores = cross_validate(gb, train_input, train_target, return_train_score = True, n_jobs=-1)
+print(np.mean(scores['train_score']), np.mean(scores['test_score']))
+```
+
+    0.9464595437171814 0.8780082549788999
+    
+
+
+```python
+# 특성 중요도
+gb.fit(train_input, train_target)
+print(gb.feature_importances_)
+# [결과 해석] 그레이디언트 부스팅이 랜텀 포레스트보다 일부 특성(당도)에 더 집중합니다.
+```
+
+    [0.15872278 0.68010884 0.16116839]
+    
+
+## 히스토그램 기반 그레이디언트 부스팅  [SKIP]
